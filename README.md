@@ -31,6 +31,9 @@ This repository provides sample implementations of following ways in which a dev
   - [CIS2 Nft](./cis2-nft/README.md)
     - Allows a user to mint A single CIS2 token (NFT) and perform various interactions specified by CIS2 Standard.
 
+  - [CIS2 4907 Nft](./cis2-4907-nft/README.md)
+    - [EIP-4907](https://eips.ethereum.org/EIPS/eip-4907) implementation over CIS2-NFT
+
 - [**Concordium Client**](./concordium-client/README.md) :
   Sample commands to interact with various provided Contracts.
 
