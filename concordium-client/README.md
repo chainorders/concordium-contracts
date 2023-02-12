@@ -29,6 +29,7 @@ concordium-client module deploy <WASM-FILE-PATH> --sender $ACCOUNT --grpc-ip $GR
 ```
 here the `WASM-FILE-PATH` can be 
 - [cis2-nft wasm](../cis2-nft/module.wasm)
+- [cis2-4907-nft wasm](../cis2-4907-nft/module.wasm)
 - [cis2-multi wasm](../cis2-multi/module.wasm)
 - [marketplace wasm](../cis2-market/module.wasm)
 - [Fractionalizer wasm](../cis2-fractionalizer/module.wasm)
@@ -52,6 +53,7 @@ Here lets for the context of this repository name our contracts in the following
 ## Interact with Contract
 
 - [CIS2 NFT](./cis2-nft.README.md)
+- [CIS2 4907 NFT](./cis2-4907-nft.README.md)
 - [CIS2 Multi](./cis2-multi.README.md)
 - [Marketplace](./cis2-market.README.md)
 - [CIS2 Fractionalizer](./cis2-fractionalizer.README.md)
