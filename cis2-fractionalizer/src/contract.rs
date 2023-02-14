@@ -197,7 +197,8 @@ fn contract_transfer<S: HasStateApi>(
         if to.address().matches_contract(&ctx.self_address()) {
             // tokens are being transferred to self
             // burn the tokens
-            let remaining_amount: ContractTokenAmount = state.burn(&token_id, amount, &from)?;
+            state.burn(&token_id, amount, &from)?;
+            let remaining_amount: ContractTokenAmount = state.get_supply(&token_id);
 
             // log burn event
             logger.log(&Cis2Event::Burn(BurnEvent {

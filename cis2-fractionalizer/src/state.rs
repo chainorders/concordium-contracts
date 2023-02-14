@@ -1,5 +1,5 @@
 use concordium_cis2::*;
-use concordium_std::{*};
+use concordium_std::*;
 
 use crate::{
     error::{ContractError, CustomContractError},
@@ -59,6 +59,7 @@ pub struct State<S> {
     pub(crate) state: StateMap<Address, AddressState<S>, S>,
     /// All of the token IDs
     pub(crate) tokens: StateMap<ContractTokenId, MetadataUrl, S>,
+    pub(crate) token_supply: StateMap<ContractTokenId, ContractTokenAmount, S>,
     /// Map with contract addresses providing implementations of additional
     /// standards.
     pub(crate) implementors: StateMap<StandardIdentifierOwned, Vec<ContractAddress>, S>,
@@ -73,6 +74,7 @@ impl<S: HasStateApi> State<S> {
             tokens: state_builder.new_map(),
             implementors: state_builder.new_map(),
             collaterals: state_builder.new_map(),
+            token_supply: state_builder.new_map(),
         }
     }
 
@@ -85,14 +87,18 @@ impl<S: HasStateApi> State<S> {
         owner: &Address,
         state_builder: &mut StateBuilder<S>,
     ) {
-        self.tokens
-            .insert(*token_id, token_metadata.to_metadata_url());
-        let mut owner_state = self
-            .state
-            .entry(*owner)
-            .or_insert_with(|| AddressState::empty(state_builder));
-        let mut owner_balance = owner_state.balances.entry(*token_id).or_insert(0.into());
-        *owner_balance += amount;
+        {
+            self.tokens
+                .insert(*token_id, token_metadata.to_metadata_url());
+            let mut owner_state = self
+                .state
+                .entry(*owner)
+                .or_insert_with(|| AddressState::empty(state_builder));
+            let mut owner_balance = owner_state.balances.entry(*token_id).or_insert(0.into());
+            *owner_balance += amount;
+        }
+
+        self.increase_supply(*token_id, amount);
     }
 
     pub(crate) fn burn(
@@ -101,21 +107,27 @@ impl<S: HasStateApi> State<S> {
         amount: ContractTokenAmount,
         owner: &Address,
     ) -> ContractResult<ContractTokenAmount> {
-        match self.state.get_mut(owner) {
-            Some(address_state) => match address_state.balances.get_mut(token_id) {
-                Some(mut b) => {
-                    ensure!(
-                        b.cmp(&amount).is_ge(),
-                        Cis2Error::Custom(CustomContractError::NoBalanceToBurn)
-                    );
+        let ret = {
+            match self.state.get_mut(owner) {
+                Some(address_state) => match address_state.balances.get_mut(token_id) {
+                    Some(mut b) => {
+                        ensure!(
+                            b.cmp(&amount).is_ge(),
+                            Cis2Error::Custom(CustomContractError::NoBalanceToBurn)
+                        );
 
-                    *b -= amount;
-                    Ok(*b)
-                }
+                        *b -= amount;
+                        Ok(*b)
+                    }
+                    None => Err(Cis2Error::Custom(CustomContractError::NoBalanceToBurn)),
+                },
                 None => Err(Cis2Error::Custom(CustomContractError::NoBalanceToBurn)),
-            },
-            None => Err(Cis2Error::Custom(CustomContractError::NoBalanceToBurn)),
-        }
+            }
+        };
+
+        self.decrease_supply(*token_id, amount);
+
+        ret
     }
 
     /// Check that the token ID currently exists in this contract.
@@ -139,6 +151,29 @@ impl<S: HasStateApi> State<S> {
                 .map_or(0.into(), |x| *x)
         });
         Ok(balance)
+    }
+
+    fn increase_supply(&mut self, token_id: ContractTokenId, amount: ContractTokenAmount) {
+        let curr_supply = self.get_supply(&token_id);
+        self.token_supply.insert(token_id, curr_supply + amount);
+    }
+
+    fn decrease_supply(&mut self, token_id: ContractTokenId, amount: ContractTokenAmount) {
+        let curr_supply = self.get_supply(&token_id);
+        let remaining_supply = curr_supply - amount;
+
+        if remaining_supply.cmp(&ContractTokenAmount::from(0)).is_eq() {
+            self.token_supply.remove(&token_id);
+        } else {
+            self.token_supply.insert(token_id, curr_supply - amount);
+        }
+    }
+
+    pub(crate) fn get_supply(&self, token_id: &ContractTokenId) -> ContractTokenAmount {
+        match self.token_supply.get(token_id) {
+            Some(amount) => *amount,
+            None => ContractTokenAmount::from(0),
+        }
     }
 
     /// Check if an address is an operator of a given owner address.
